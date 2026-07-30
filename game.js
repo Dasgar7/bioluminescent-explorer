@@ -194,7 +194,6 @@ function placeStructures() {
     const angle = Math.random() * Math.PI * 2, dist = 25 + Math.random() * 40;
     const px = Math.cos(angle) * dist, pz = Math.sin(angle) * dist, py = getHeight(px, pz);
     const w = 4.2 + Math.random() * 2, h = 5.5 + Math.random() * 3;
-    scene.add(new THREE.Mesh(new THREE.BoxGeometry(0.55, h, 0.55), pillarMat).translateX(px - w / 2).translateY(py + h / 2).translateZ(pz) || (() => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.55, h, 0.55), pillarMat); m.position.set(px - w / 2, py + h / 2, pz); scene.add(m); return m; })());
     const left = new THREE.Mesh(new THREE.BoxGeometry(0.55, h, 0.55), pillarMat); left.position.set(px - w / 2, py + h / 2, pz); scene.add(left);
     const right = new THREE.Mesh(new THREE.BoxGeometry(0.55, h, 0.55), pillarMat); right.position.set(px + w / 2, py + h / 2, pz); scene.add(right);
     const top = new THREE.Mesh(new THREE.BoxGeometry(w + 0.55, 0.4, 0.55), pillarMat); top.position.set(px, py + h, pz); scene.add(top);
