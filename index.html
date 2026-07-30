@@ -10,18 +10,18 @@
   <meta name="screen-orientation" content="landscape" />
   <link rel="manifest" href="./manifest.json" />
   <link rel="apple-touch-icon" href="./icons/icon.svg" />
-  <title>Bioluminescent Explorer</title>
+  <title>City Explorer</title>
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
   <div id="ui">
     <div id="start-screen">
       <div class="title-block">
-        <h1>BIOLUMINESCENT</h1>
+        <h1>CITY</h1>
         <h2>EXPLORER</h2>
-        <p>Explore a vibrant fantasy world of glowing crystals and floating islands.</p>
+        <p>Walk the streets · Switch cameras · Explore</p>
       </div>
-      <button id="start-btn">ENTER THE GROVE</button>
+      <button id="start-btn">ENTER CITY</button>
       <p class="hint">Best in landscape · Install as app for fullscreen</p>
     </div>
 
@@ -33,9 +33,10 @@
       </div>
       <div id="look-zone"></div>
       <button id="jump-btn" aria-label="Jump">↑</button>
+      <button id="cam-btn" aria-label="Camera mode">CAM</button>
       <div id="crosshair">+</div>
       <div id="status">
-        <span id="fps">60</span> FPS
+        <span id="cam-label">1st</span> · <span id="fps">60</span> FPS
       </div>
     </div>
   </div>
