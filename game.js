@@ -312,7 +312,6 @@ function setupControls() {
     const nx = (dx / len) * clamped;
     const ny = (dy / len) * clamped;
     knob.style.transform = `translate(${nx}px, ${ny}px)`;
-    // FIXED joystick: stick UP (ny < 0) → moveInput.z > 0 → forward
     moveInput.x = nx / maxStick;
     moveInput.z = -ny / maxStick;
   }
@@ -351,10 +350,18 @@ function setupControls() {
     e.preventDefault();
     for (const t of e.changedTouches) {
       if (t.identifier === lookId) {
-        const dx = t.clientX - lastLookX, dy = t.clientY - lastLookY;
-        lastLookX = t.clientX; lastLookY = t.clientY;
-        player.yaw -= dx * CONFIG.lookSens;
-        player.pitch = THREE.MathUtils.clamp(player.pitch - dy * CONFIG.lookSens, -CONFIG.maxPitch, CONFIG.maxPitch);
+        // Relative delta each frame (not absolute) — accumulates on current yaw/pitch
+        const dx = t.clientX - lastLookX;
+        const dy = t.clientY - lastLookY;
+        lastLookX = t.clientX;
+        lastLookY = t.clientY;
+        // FIXED: swipe right → look right; swipe down → look down
+        player.yaw += dx * CONFIG.lookSens;
+        player.pitch = THREE.MathUtils.clamp(
+          player.pitch + dy * CONFIG.lookSens,
+          -CONFIG.maxPitch,
+          CONFIG.maxPitch
+        );
       }
     }
   }, { passive: false });
@@ -375,8 +382,12 @@ function setupControls() {
   });
   document.addEventListener('mousemove', (e) => {
     if (document.pointerLockElement) {
-      player.yaw -= e.movementX * CONFIG.lookSensDesktop;
-      player.pitch = THREE.MathUtils.clamp(player.pitch - e.movementY * CONFIG.lookSensDesktop, -CONFIG.maxPitch, CONFIG.maxPitch);
+      player.yaw += e.movementX * CONFIG.lookSensDesktop;
+      player.pitch = THREE.MathUtils.clamp(
+        player.pitch + e.movementY * CONFIG.lookSensDesktop,
+        -CONFIG.maxPitch,
+        CONFIG.maxPitch
+      );
     }
   });
 }
@@ -397,7 +408,6 @@ function updatePlayer(dt) {
   const speed = CONFIG.moveSpeed * (keys['ShiftLeft'] || keys['ShiftRight'] ? CONFIG.sprintMult : 1);
   const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
 
-  // FIXED: +iz (stick up / W) → forward (-Z when yaw=0)
   player.vel.x = (ix * cos + iz * sin) * speed;
   player.vel.z = (-ix * sin - iz * cos) * speed;
   player.vel.y += CONFIG.gravity * dt;
