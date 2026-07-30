@@ -1,4 +1,4 @@
-const CACHE = 'bio-explorer-v3';
+const CACHE = 'bio-explorer-v5';
 const ASSETS = [
   './',
   './index.html',
