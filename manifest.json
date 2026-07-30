@@ -1,12 +1,12 @@
 {
   "name": "Bioluminescent Explorer",
   "short_name": "BioExplorer",
-  "description": "A dark, moody first-person exploration game with glowing bioluminescent world. Mobile-first 3D experience.",
+  "description": "A vibrant stylized first-person exploration game with glowing crystals, floating islands, and surreal biomes. Mobile-first 3D PWA.",
   "start_url": "./",
   "display": "standalone",
   "orientation": "landscape",
-  "background_color": "#02040a",
-  "theme_color": "#02040a",
+  "background_color": "#87ceeb",
+  "theme_color": "#87ceeb",
   "icons": [
     {
       "src": "./icons/icon.svg",

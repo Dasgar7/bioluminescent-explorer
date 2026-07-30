@@ -12,9 +12,9 @@ html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #02040a;
+  background: #87ceeb;
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  color: #a0f0c0;
+  color: #1a3a2a;
 }
 
 #c {
@@ -37,7 +37,7 @@ html, body {
   pointer-events: auto;
 }
 
-/* Start screen */
+/* Start screen — bright stylized */
 #start-screen {
   position: absolute;
   inset: 0;
@@ -45,7 +45,7 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(ellipse at center, #0a1a14 0%, #02040a 70%);
+  background: linear-gradient(160deg, #ffb347 0%, #ff6b9a 35%, #7b5cff 70%, #4ecdc4 100%);
   text-align: center;
   padding: 1.5rem;
   transition: opacity 0.6s ease, visibility 0.6s;
@@ -59,51 +59,56 @@ html, body {
 
 .title-block h1 {
   font-size: clamp(1.8rem, 6vw, 3.2rem);
-  font-weight: 300;
-  letter-spacing: 0.35em;
-  color: #7dffb3;
-  text-shadow: 0 0 20px #2aff8a, 0 0 40px #0a5c3a;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  color: #ffffff;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.25), 0 0 30px rgba(61, 255, 154, 0.5);
   margin-bottom: 0.2rem;
 }
 
 .title-block h2 {
   font-size: clamp(1.1rem, 4vw, 1.8rem);
-  font-weight: 200;
-  letter-spacing: 0.55em;
-  color: #4ad88a;
+  font-weight: 400;
+  letter-spacing: 0.45em;
+  color: #e8fff0;
   margin-bottom: 1.2rem;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.2);
 }
 
 .title-block p {
-  color: #6a9a7a;
+  color: rgba(255,255,255,0.9);
   font-size: 0.95rem;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   margin-bottom: 2.5rem;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.2);
 }
 
 #start-btn {
-  background: transparent;
-  border: 1px solid #3dff9a;
-  color: #9fffcf;
+  background: rgba(255,255,255,0.2);
+  border: 2px solid #3dff9a;
+  color: #ffffff;
   padding: 0.9rem 2.4rem;
   font-size: 1rem;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.18em;
   cursor: pointer;
-  border-radius: 2px;
+  border-radius: 8px;
   transition: all 0.25s;
-  box-shadow: 0 0 18px rgba(61, 255, 154, 0.25);
+  box-shadow: 0 0 24px rgba(61, 255, 154, 0.4);
+  backdrop-filter: blur(6px);
+  font-weight: 600;
 }
 
 #start-btn:hover, #start-btn:active {
-  background: rgba(61, 255, 154, 0.12);
-  box-shadow: 0 0 28px rgba(61, 255, 154, 0.45);
+  background: rgba(61, 255, 154, 0.35);
+  box-shadow: 0 0 36px rgba(61, 255, 154, 0.6);
+  transform: scale(1.03);
 }
 
 .hint {
   margin-top: 1.8rem;
   font-size: 0.75rem;
-  color: #3a6a4a;
-  letter-spacing: 0.05em;
+  color: rgba(255,255,255,0.75);
+  letter-spacing: 0.04em;
 }
 
 /* HUD */
@@ -121,7 +126,6 @@ html, body {
   pointer-events: auto;
 }
 
-/* Virtual joystick - bottom left */
 #joystick-zone {
   position: absolute;
   left: 0;
@@ -138,9 +142,10 @@ html, body {
   width: 120px;
   height: 120px;
   border-radius: 50%;
-  background: rgba(20, 40, 30, 0.45);
-  border: 2px solid rgba(80, 220, 140, 0.35);
-  box-shadow: 0 0 16px rgba(40, 180, 100, 0.2);
+  background: rgba(255, 255, 255, 0.22);
+  border: 2px solid rgba(61, 255, 154, 0.55);
+  box-shadow: 0 0 16px rgba(61, 255, 154, 0.25);
+  backdrop-filter: blur(4px);
 }
 
 #joystick-knob {
@@ -152,13 +157,12 @@ html, body {
   margin-left: -26px;
   margin-top: -26px;
   border-radius: 50%;
-  background: rgba(80, 240, 150, 0.55);
-  border: 2px solid rgba(160, 255, 200, 0.7);
-  box-shadow: 0 0 12px rgba(80, 255, 160, 0.5);
+  background: rgba(61, 255, 154, 0.7);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 14px rgba(61, 255, 154, 0.55);
   transition: background 0.1s;
 }
 
-/* Look zone - right side */
 #look-zone {
   position: absolute;
   right: 0;
@@ -168,7 +172,6 @@ html, body {
   z-index: 15;
 }
 
-/* Jump button */
 #jump-btn {
   position: absolute;
   right: 28px;
@@ -176,35 +179,35 @@ html, body {
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: rgba(20, 50, 35, 0.55);
-  border: 2px solid rgba(80, 220, 140, 0.5);
-  color: #9fffcf;
+  background: rgba(255, 255, 255, 0.25);
+  border: 2px solid rgba(61, 255, 154, 0.65);
+  color: #1a3a2a;
   font-size: 1.6rem;
-  font-weight: 300;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 25;
-  box-shadow: 0 0 14px rgba(60, 200, 120, 0.3);
+  box-shadow: 0 0 16px rgba(61, 255, 154, 0.3);
   transition: transform 0.1s, background 0.1s;
+  backdrop-filter: blur(4px);
 }
 
 #jump-btn:active {
   transform: scale(0.92);
-  background: rgba(40, 100, 70, 0.7);
+  background: rgba(61, 255, 154, 0.45);
 }
 
-/* Crosshair */
 #crosshair {
   position: absolute;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  color: rgba(140, 255, 180, 0.55);
+  color: rgba(30, 80, 50, 0.55);
   font-size: 18px;
-  font-weight: 200;
+  font-weight: 300;
   pointer-events: none;
-  text-shadow: 0 0 6px rgba(80, 255, 140, 0.6);
+  text-shadow: 0 0 4px rgba(255,255,255,0.6);
   z-index: 5;
 }
 
@@ -213,19 +216,19 @@ html, body {
   top: 12px;
   right: 16px;
   font-size: 0.7rem;
-  color: rgba(120, 200, 150, 0.55);
+  color: rgba(20, 50, 40, 0.55);
   letter-spacing: 0.05em;
   pointer-events: none;
   z-index: 5;
+  text-shadow: 0 1px 2px rgba(255,255,255,0.5);
 }
 
-/* Landscape encouragement for portrait phones */
 @media (orientation: portrait) and (max-width: 900px) {
   #start-screen::after {
     content: '↻ Rotate to landscape for best experience';
     display: block;
     margin-top: 1.5rem;
-    color: #5a9a6a;
+    color: rgba(255,255,255,0.85);
     font-size: 0.85rem;
     animation: pulse 2s ease-in-out infinite;
   }
@@ -236,7 +239,6 @@ html, body {
   50% { opacity: 1; }
 }
 
-/* Safe area for notched phones */
 @supports (padding: env(safe-area-inset-bottom)) {
   #joystick-base {
     bottom: calc(28px + env(safe-area-inset-bottom));
