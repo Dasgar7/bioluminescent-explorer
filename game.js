@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-// Bright daytime city explorer — mobile performance
+// Bright daytime city explorer — standard FPS controls
 const CONFIG = {
   moveSpeed: 7.4,
   sprintMult: 1.5,
@@ -8,7 +8,7 @@ const CONFIG = {
   gravity: -22,
   playerHeight: 1.65,
   playerRadius: 0.38,
-  lookSens: 0.0026,
+  lookSens: 0.0028,
   lookSensDesktop: 0.0020,
   maxPitch: Math.PI / 2.2,
   worldSize: 160,
@@ -28,13 +28,19 @@ let player = {
 };
 let heightData;
 let colliders = [];
-let moveInput = { x: 0, z: 0 };
+// joystick: x = strafe (-1 left .. +1 right), y = forward (-1 back .. +1 forward)
+let moveInput = { x: 0, y: 0 };
 let lastLookX = 0, lastLookY = 0;
 let keys = {};
 let fpsEl, frameCount = 0, lastFpsTime = 0;
 let started = false;
 let spores = null;
 let sporeVel = null;
+
+const _forward = new THREE.Vector3();
+const _right = new THREE.Vector3();
+const _worldUp = new THREE.Vector3(0, 1, 0);
+const _wish = new THREE.Vector3();
 
 function init() {
   const canvas = document.getElementById('c');
@@ -313,20 +319,24 @@ function setupControls() {
     const ny = (dy / len) * clamped;
     knob.style.transform = `translate(${nx}px, ${ny}px)`;
     moveInput.x = nx / maxStick;
-    moveInput.z = -ny / maxStick;
+    moveInput.y = -ny / maxStick;
   }
   function resetStick() {
     knob.style.transform = 'translate(0px, 0px)';
-    moveInput.x = 0; moveInput.z = 0; stickId = null;
+    moveInput.x = 0;
+    moveInput.y = 0;
+    stickId = null;
   }
 
   base.addEventListener('touchstart', (e) => {
     e.preventDefault();
     if (stickId !== null) return;
-    const t = e.changedTouches[0]; stickId = t.identifier;
+    const t = e.changedTouches[0];
+    stickId = t.identifier;
     const rect = base.getBoundingClientRect();
     setStick(t.clientX - (rect.left + rect.width / 2), t.clientY - (rect.top + rect.height / 2));
   }, { passive: false });
+
   base.addEventListener('touchmove', (e) => {
     e.preventDefault();
     for (const t of e.changedTouches) {
@@ -336,26 +346,30 @@ function setupControls() {
       }
     }
   }, { passive: false });
-  const endStick = (e) => { for (const t of e.changedTouches) if (t.identifier === stickId) resetStick(); };
+
+  const endStick = (e) => {
+    for (const t of e.changedTouches) if (t.identifier === stickId) resetStick();
+  };
   base.addEventListener('touchend', endStick);
   base.addEventListener('touchcancel', endStick);
 
   lookZone.addEventListener('touchstart', (e) => {
     e.preventDefault();
     if (lookId !== null) return;
-    const t = e.changedTouches[0]; lookId = t.identifier;
-    lastLookX = t.clientX; lastLookY = t.clientY;
+    const t = e.changedTouches[0];
+    lookId = t.identifier;
+    lastLookX = t.clientX;
+    lastLookY = t.clientY;
   }, { passive: false });
+
   lookZone.addEventListener('touchmove', (e) => {
     e.preventDefault();
     for (const t of e.changedTouches) {
       if (t.identifier === lookId) {
-        // Relative delta each frame (not absolute) — accumulates on current yaw/pitch
         const dx = t.clientX - lastLookX;
         const dy = t.clientY - lastLookY;
         lastLookX = t.clientX;
         lastLookY = t.clientY;
-        // FIXED: swipe right → look right; swipe down → look down
         player.yaw += dx * CONFIG.lookSens;
         player.pitch = THREE.MathUtils.clamp(
           player.pitch + dy * CONFIG.lookSens,
@@ -365,7 +379,11 @@ function setupControls() {
       }
     }
   }, { passive: false });
+
   lookZone.addEventListener('touchend', (e) => {
+    for (const t of e.changedTouches) if (t.identifier === lookId) lookId = null;
+  });
+  lookZone.addEventListener('touchcancel', (e) => {
     for (const t of e.changedTouches) if (t.identifier === lookId) lookId = null;
   });
 
@@ -377,6 +395,7 @@ function setupControls() {
     if (e.code === 'Space') { e.preventDefault(); tryJump(); }
   });
   window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
   document.addEventListener('click', () => {
     if (started && !('ontouchstart' in window)) document.body.requestPointerLock?.();
   });
@@ -393,61 +412,99 @@ function setupControls() {
 }
 
 function tryJump() {
-  if (player.onGround) { player.vel.y = CONFIG.jumpForce; player.onGround = false; }
+  if (player.onGround) {
+    player.vel.y = CONFIG.jumpForce;
+    player.onGround = false;
+  }
 }
 
 function updatePlayer(dt) {
-  let ix = moveInput.x, iz = moveInput.z;
-  if (keys['KeyW'] || keys['ArrowUp']) iz += 1;
-  if (keys['KeyS'] || keys['ArrowDown']) iz -= 1;
-  if (keys['KeyA'] || keys['ArrowLeft']) ix -= 1;
-  if (keys['KeyD'] || keys['ArrowRight']) ix += 1;
-  const len = Math.hypot(ix, iz);
-  if (len > 1) { ix /= len; iz /= len; }
+  // 1. Apply camera rotation from accumulated yaw/pitch
+  camera.rotation.order = 'YXZ';
+  camera.rotation.y = player.yaw;
+  camera.rotation.x = player.pitch;
 
-  const speed = CONFIG.moveSpeed * (keys['ShiftLeft'] || keys['ShiftRight'] ? CONFIG.sprintMult : 1);
-  const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
+  // 2. Camera-relative horizontal axes (Minecraft-style)
+  camera.getWorldDirection(_forward);
+  _forward.y = 0;
+  if (_forward.lengthSq() < 1e-6) {
+    _forward.set(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+  } else {
+    _forward.normalize();
+  }
+  _right.crossVectors(_forward, _worldUp).normalize();
 
-  player.vel.x = (ix * cos + iz * sin) * speed;
-  player.vel.z = (-ix * sin - iz * cos) * speed;
+  // 3. Wish direction from joystick + keyboard
+  let mx = moveInput.x;
+  let my = moveInput.y;
+  if (keys['KeyW'] || keys['ArrowUp'])    my += 1;
+  if (keys['KeyS'] || keys['ArrowDown'])  my -= 1;
+  if (keys['KeyA'] || keys['ArrowLeft'])  mx -= 1;
+  if (keys['KeyD'] || keys['ArrowRight']) mx += 1;
+
+  const len = Math.hypot(mx, my);
+  if (len > 1) { mx /= len; my /= len; }
+
+  const speed = CONFIG.moveSpeed * (
+    (keys['ShiftLeft'] || keys['ShiftRight']) ? CONFIG.sprintMult : 1
+  );
+
+  _wish.set(0, 0, 0);
+  _wish.addScaledVector(_forward, my);
+  _wish.addScaledVector(_right, mx);
+  if (_wish.lengthSq() > 0) _wish.normalize().multiplyScalar(speed);
+
+  player.vel.x = _wish.x;
+  player.vel.z = _wish.z;
   player.vel.y += CONFIG.gravity * dt;
 
+  // 4. Integrate + collide
   let nx = player.pos.x + player.vel.x * dt;
   let ny = player.pos.y + player.vel.y * dt;
   let nz = player.pos.z + player.vel.z * dt;
 
   const groundY = getHeight(nx, nz) + CONFIG.playerHeight;
-  if (ny <= groundY) { ny = groundY; player.vel.y = 0; player.onGround = true; }
-  else player.onGround = false;
+  if (ny <= groundY) {
+    ny = groundY;
+    player.vel.y = 0;
+    player.onGround = true;
+  } else {
+    player.onGround = false;
+  }
 
   const pr = CONFIG.playerRadius;
   for (const c of colliders) {
     if (nx > c.min.x - pr && nx < c.max.x + pr &&
         nz > c.min.z - pr && nz < c.max.z + pr &&
         ny > c.min.y && ny - CONFIG.playerHeight < c.max.y) {
-      const cx = (c.min.x + c.max.x) * 0.5, cz = (c.min.z + c.max.z) * 0.5;
+      const cx = (c.min.x + c.max.x) * 0.5;
+      const cz = (c.min.z + c.max.z) * 0.5;
       const dx = nx - cx, dz = nz - cz;
-      const halfX = (c.max.x - c.min.x) * 0.5 + pr, halfZ = (c.max.z - c.min.z) * 0.5 + pr;
-      if (halfX - Math.abs(dx) < halfZ - Math.abs(dz)) nx = cx + Math.sign(dx || 1) * halfX;
-      else nz = cz + Math.sign(dz || 1) * halfZ;
+      const halfX = (c.max.x - c.min.x) * 0.5 + pr;
+      const halfZ = (c.max.z - c.min.z) * 0.5 + pr;
+      if (halfX - Math.abs(dx) < halfZ - Math.abs(dz)) {
+        nx = cx + Math.sign(dx || 1) * halfX;
+      } else {
+        nz = cz + Math.sign(dz || 1) * halfZ;
+      }
     }
   }
 
   const bound = CONFIG.worldSize * 0.47;
   nx = THREE.MathUtils.clamp(nx, -bound, bound);
   nz = THREE.MathUtils.clamp(nz, -bound, bound);
+
   player.pos.set(nx, ny, nz);
   camera.position.copy(player.pos);
-  camera.rotation.order = 'YXZ';
-  camera.rotation.y = player.yaw;
-  camera.rotation.x = player.pitch;
 }
 
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.048);
-  if (started) { updatePlayer(dt); updateSpores(dt); }
-  else {
+  if (started) {
+    updatePlayer(dt);
+    updateSpores(dt);
+  } else {
     const t = clock.elapsedTime;
     camera.position.set(Math.sin(t * 0.12) * 22, 14 + Math.sin(t * 0.15) * 1.5, Math.cos(t * 0.12) * 22);
     camera.lookAt(0, 5, 0);
@@ -456,7 +513,8 @@ function animate() {
   frameCount++;
   if (clock.elapsedTime - lastFpsTime > 0.6) {
     if (fpsEl) fpsEl.textContent = Math.round(frameCount / (clock.elapsedTime - lastFpsTime));
-    frameCount = 0; lastFpsTime = clock.elapsedTime;
+    frameCount = 0;
+    lastFpsTime = clock.elapsedTime;
   }
 }
 
