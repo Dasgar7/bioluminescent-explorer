@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#02040a" />
+  <meta name="screen-orientation" content="landscape" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+  <title>Bioluminescent Explorer</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div id="ui">
+    <div id="start-screen">
+      <div class="title-block">
+        <h1>BIOLUMINESCENT</h1>
+        <h2>EXPLORER</h2>
+        <p>Walk the glowing dark. Discover the light.</p>
+      </div>
+      <button id="start-btn">ENTER THE GROVE</button>
+      <p class="hint">Best in landscape · Install as app for fullscreen</p>
+    </div>
+
+    <div id="hud" class="hidden">
+      <div id="joystick-zone">
+        <div id="joystick-base">
+          <div id="joystick-knob"></div>
+        </div>
+      </div>
+      <div id="look-zone"></div>
+      <button id="jump-btn" aria-label="Jump">↑</button>
+      <div id="crosshair">+</div>
+      <div id="status">
+        <span id="fps">60</span> FPS
+      </div>
+    </div>
+  </div>
+
+  <canvas id="c"></canvas>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="./game.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(console.warn);
+      });
+    }
+  </script>
+</body>
+</html>
