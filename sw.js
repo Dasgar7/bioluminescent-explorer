@@ -1,4 +1,4 @@
-const CACHE = 'bio-explorer-v1';
+const CACHE = 'bio-explorer-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -25,9 +25,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (url.origin.includes('unpkg.com') || url.origin.includes('cdn')) {
-    e.respondWith(
-      fetch(e.request).catch(() => caches.match(e.request))
-    );
+    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
     return;
   }
   e.respondWith(
