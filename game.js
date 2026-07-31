@@ -9,22 +9,26 @@ const CONFIG = {
 
 let scene, camera, renderer, clock;
 let player = { pos: new THREE.Vector3(0,4,0), vel: new THREE.Vector3(), onGround:false, yaw:0, pitch:-0.05 };
-let heightData, colliders=[], footprints=[];
+let heightData, colliders=[], footprints=[], doors=[];
 let moveInput={x:0,y:0}, lastLookX=0, lastLookY=0, keys={};
 let fpsEl, camLabelEl, frameCount=0, lastFpsTime=0, started=false, camMode=0;
-let cars=[], npcs=[], animals=[], birds=[], audioCtx=null, footstepTimer=0;
+let cars=[], npcs=[], animals=[], audioCtx=null, footstepTimer=0;
+let playerBody=null, walkPhase=0, walkAmt=0;
+let interiorActive=null, interiorExitPos=null, interiorGroup=null, interiorFurniture=null;
+let outdoorColliders=null;
+const INT_ORIGIN = new THREE.Vector3(0, -80, 0);
 const _f=new THREE.Vector3(), _r=new THREE.Vector3(), _w=new THREE.Vector3();
 const _t=new THREE.Vector3(), _o=new THREE.Vector3();
 
 const BTYPES = {
-  house:{cols:[0xe8d5b7,0xd4c4a8],roof:0x8b4513,h:[5,9],label:'HOUSE',sign:null},
-  restaurant:{cols:[0xc0392b,0xe74c3c],roof:0x2c3e50,h:[6,10],label:'RESTAURANT',sign:0xe74c3c},
-  cafe:{cols:[0xf5cba7,0xd5a574],roof:0x5d4e37,h:[5,8],label:'CAFE',sign:0xf39c12},
-  hospital:{cols:[0xecf0f1,0xffffff],roof:0x3498db,h:[10,15],label:'HOSPITAL',sign:0xe74c3c},
-  school:{cols:[0xf9e79f,0xf7dc6f],roof:0x1a5276,h:[8,12],label:'SCHOOL',sign:0x2980b9},
-  police:{cols:[0x2c3e50,0x34495e],roof:0x1a1a2e,h:[7,11],label:'POLICE',sign:0x3498db},
-  office:{cols:[0xbdc3c7,0xaab7b8],roof:0x566573,h:[12,20],label:null,sign:null},
-  shop:{cols:[0xaed6f1,0x85c1e9],roof:0x2874a6,h:[5,9],label:'SHOP',sign:0x2ecc71}
+  house:{cols:[0xe8d5b7,0xd4c4a8],roof:0x8b4513,h:[5,9],label:'HOUSE',sign:null,enter:true},
+  restaurant:{cols:[0xc0392b,0xe74c3c],roof:0x2c3e50,h:[6,10],label:'RESTAURANT',sign:0xe74c3c,enter:true},
+  cafe:{cols:[0xf5cba7,0xd5a574],roof:0x5d4e37,h:[5,8],label:'CAFE',sign:0xf39c12,enter:true},
+  hospital:{cols:[0xecf0f1,0xffffff],roof:0x3498db,h:[10,15],label:'HOSPITAL',sign:0xe74c3c,enter:true},
+  school:{cols:[0xf9e79f,0xf7dc6f],roof:0x1a5276,h:[8,12],label:'SCHOOL',sign:0x2980b9,enter:true},
+  police:{cols:[0x2c3e50,0x34495e],roof:0x1a1a2e,h:[7,11],label:'POLICE',sign:0x3498db,enter:true},
+  office:{cols:[0xbdc3c7,0xaab7b8],roof:0x566573,h:[12,20],label:null,sign:null,enter:false},
+  shop:{cols:[0xaed6f1,0x85c1e9],roof:0x2874a6,h:[5,9],label:'SHOP',sign:0x2ecc71,enter:true}
 };
 
 function isClear(x,z,rad=1.2){
@@ -65,20 +69,16 @@ function init(){
   sun.position.set(80,120,50); scene.add(sun);
   const fill=new THREE.DirectionalLight(0xaaccff,0.3);
   fill.position.set(-40,50,-60); scene.add(fill);
-
   const sunMesh=new THREE.Mesh(new THREE.SphereGeometry(9,12,12),new THREE.MeshBasicMaterial({color:0xfff2a0,fog:false}));
   sunMesh.position.copy(sun.position).normalize().multiplyScalar(200); scene.add(sunMesh);
 
   try{
-    buildGround();
-    placeBuildings();
-    placeProps();
-    spawnCars();
-    spawnNpcs();
-    spawnAnimals();
+    buildGround(); placeBuildings(); placeProps();
+    spawnCars(); spawnNpcs(); spawnAnimals();
+    buildPlayerBody(); buildInteriorRoom();
   }catch(e){console.error('[City] build error',e);}
 
-  console.log('[City] children:',scene.children.length,'colliders:',colliders.length);
+  console.log('[City] children:',scene.children.length,'doors:',doors.length);
   player.pos.set(0,CONFIG.playerHeight+0.5,0);
   setupControls();
   window.addEventListener('resize',onResize,{passive:true});
@@ -143,6 +143,7 @@ function buildGround(){
   scene.add(new THREE.Mesh(geo,new THREE.MeshLambertMaterial({vertexColors:true})));
 }
 function getHeight(x,z){
+  if(interiorActive) return INT_ORIGIN.y;
   const res=CONFIG.terrainRes,size=CONFIG.worldSize,half=size/2;
   const u=(x+half)/size,v=(z+half)/size;
   if(u<=0||u>=1||v<=0||v>=1) return 0;
@@ -169,10 +170,9 @@ function makeBldg(typeKey,bw,bh,bd){
   const winMat=new THREE.MeshLambertMaterial({color:0x1a2a38,emissive:0x223344,emissiveIntensity:0.12});
   const winLit=new THREE.MeshBasicMaterial({color:0xffe8a0});
   const doorMat=new THREE.MeshLambertMaterial({color:0x3d2914});
-
+  const frameMat=new THREE.MeshLambertMaterial({color:0x666666});
   const body=new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd),bodyMat);
   body.position.y=bh/2; g.add(body);
-
   if(typeKey==='house'){
     const rh=1.3+Math.random()*0.5;
     const roof=new THREE.Mesh(new THREE.ConeGeometry(Math.max(bw,bd)*0.7,rh,4),roofMat);
@@ -181,23 +181,25 @@ function makeBldg(typeKey,bw,bh,bd){
     const roof=new THREE.Mesh(new THREE.BoxGeometry(bw*1.04,0.2,bd*1.04),roofMat);
     roof.position.y=bh+0.1; g.add(roof);
   }
-
-  const dw=Math.min(1.1,bw*0.25), dh=Math.min(2.1,bh*0.35);
+  const dw=Math.min(1.15,bw*0.28), dh=Math.min(2.15,bh*0.38);
+  const frame=new THREE.Mesh(new THREE.BoxGeometry(dw+0.25,dh+0.2,0.1),frameMat);
+  frame.position.set(0,dh/2,bd/2+0.02); g.add(frame);
   const door=new THREE.Mesh(new THREE.BoxGeometry(dw,dh,0.08),doorMat);
-  door.position.set(0,dh/2,bd/2+0.04); g.add(door);
-
+  door.position.set(0,dh/2,bd/2+0.06); g.add(door);
+  const handle=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.08,0.12),new THREE.MeshLambertMaterial({color:0xc0a060}));
+  handle.position.set(dw*0.28,dh*0.5,bd/2+0.12); g.add(handle);
   if(bh>5){
     const rows=Math.min(5,Math.floor(bh/2.3)), cols=Math.max(2,Math.floor(bw/2.1));
     for(let r=1;r<rows;r++) for(let c=0;c<cols;c++){
-      if(Math.random()<0.2) continue;
+      if(Math.random()<0.18) continue;
       const w=new THREE.Mesh(new THREE.BoxGeometry(0.45,0.55,0.06),Math.random()<0.2?winLit:winMat);
       w.position.set(-bw/2+1+c*((bw-2)/Math.max(1,cols-1)),1.4+r*2.1,bd/2+0.04);
       g.add(w);
     }
   }
   if(typeKey==='cafe'||typeKey==='restaurant'||typeKey==='shop'){
-    const aw=new THREE.Mesh(new THREE.BoxGeometry(bw*0.6,0.08,1.0),new THREE.MeshLambertMaterial({color:t.sign||0xe74c3c}));
-    aw.position.set(0,2.4,bd/2+0.5); g.add(aw);
+    const aw=new THREE.Mesh(new THREE.BoxGeometry(bw*0.65,0.08,1.1),new THREE.MeshLambertMaterial({color:t.sign||0xe74c3c}));
+    aw.position.set(0,2.5,bd/2+0.55); g.add(aw);
   }
   if(t.label){
     const sign=new THREE.Mesh(new THREE.BoxGeometry(Math.min(bw*0.5,3),0.45,0.1),new THREE.MeshBasicMaterial({color:t.sign||0x3dff9a}));
@@ -218,7 +220,7 @@ function makeBldg(typeKey,bw,bh,bd){
 
 function placeBuildings(){
   const half=CONFIG.worldSize*0.42, cell=CONFIG.blockSize+CONFIG.streetWidth;
-  let bi=0;
+  let bi=0, enterCount=0;
   for(let gx=-half;gx<half;gx+=cell){
     for(let gz=-half;gz<half;gz+=cell){
       if(Math.abs(gx)<cell*1.05&&Math.abs(gz)<cell*1.05) continue;
@@ -234,13 +236,162 @@ function placeBuildings(){
       const grp=makeBldg(typeKey,bw,bh,bd);
       grp.position.set(cx,py,cz); scene.add(grp);
       addFoot(cx,cz,bw,bd);
-      colliders.push({
-        min:new THREE.Vector3(cx-bw/2-0.1,py,cz-bd/2-0.1),
-        max:new THREE.Vector3(cx+bw/2+0.1,py+bh+1,cz+bd/2+0.1)
-      });
+      if(t.enter && enterCount<12 && bw>6){
+        colliders.push({min:new THREE.Vector3(cx-bw/2-0.1,py,cz-bd/2-0.1),max:new THREE.Vector3(cx-0.9,py+bh+1,cz+bd/2+0.1)});
+        colliders.push({min:new THREE.Vector3(cx+0.9,py,cz-bd/2-0.1),max:new THREE.Vector3(cx+bw/2+0.1,py+bh+1,cz+bd/2+0.1)});
+        colliders.push({min:new THREE.Vector3(cx-bw/2-0.1,py,cz-bd/2-0.1),max:new THREE.Vector3(cx+bw/2+0.1,py+bh+1,cz+0.15)});
+        doors.push({
+          type:typeKey,
+          min:new THREE.Vector3(cx-0.85,py,cz+bd/2-0.3),
+          max:new THREE.Vector3(cx+0.85,py+2.4,cz+bd/2+1.0),
+          exitSpot:new THREE.Vector3(cx,py+CONFIG.playerHeight,cz+bd/2+1.5)
+        });
+        enterCount++;
+      } else {
+        colliders.push({
+          min:new THREE.Vector3(cx-bw/2-0.1,py,cz-bd/2-0.1),
+          max:new THREE.Vector3(cx+bw/2+0.1,py+bh+1,cz+bd/2+0.1)
+        });
+      }
     }
   }
-  console.log('[City] buildings ok, footprints',footprints.length);
+  console.log('[City] enterable doors:',enterCount);
+}
+
+function buildInteriorRoom(){
+  interiorGroup=new THREE.Group();
+  interiorGroup.position.copy(INT_ORIGIN);
+  const wallM=new THREE.MeshLambertMaterial({color:0xf0ebe3});
+  const floorM=new THREE.MeshLambertMaterial({color:0xc4a882});
+  const ceilM=new THREE.MeshLambertMaterial({color:0xf5f5f5});
+  const W=10, D=8, H=3.2;
+  const floor=new THREE.Mesh(new THREE.BoxGeometry(W,0.1,D),floorM); floor.position.y=0.05; interiorGroup.add(floor);
+  const ceil=new THREE.Mesh(new THREE.BoxGeometry(W,0.1,D),ceilM); ceil.position.y=H; interiorGroup.add(ceil);
+  const back=new THREE.Mesh(new THREE.BoxGeometry(W,H,0.2),wallM); back.position.set(0,H/2,-D/2); interiorGroup.add(back);
+  const left=new THREE.Mesh(new THREE.BoxGeometry(0.2,H,D),wallM); left.position.set(-W/2,H/2,0); interiorGroup.add(left);
+  const right=new THREE.Mesh(new THREE.BoxGeometry(0.2,H,D),wallM); right.position.set(W/2,H/2,0); interiorGroup.add(right);
+  const pl=new THREE.PointLight(0xfff5e0,0.9,14,2); pl.position.set(0,H-0.4,0); interiorGroup.add(pl);
+  const exitMark=new THREE.Mesh(new THREE.BoxGeometry(2,0.06,0.8),new THREE.MeshBasicMaterial({color:0x3dff9a}));
+  exitMark.position.set(0,0.08,D/2-0.5); interiorGroup.add(exitMark);
+  interiorFurniture=new THREE.Group(); interiorGroup.add(interiorFurniture);
+  interiorGroup.visible=false;
+  scene.add(interiorGroup);
+}
+
+function fillInterior(type){
+  while(interiorFurniture.children.length) interiorFurniture.remove(interiorFurniture.children[0]);
+  const wood=new THREE.MeshLambertMaterial({color:0x8b6914});
+  const white=new THREE.MeshLambertMaterial({color:0xecf0f1});
+  const dark=new THREE.MeshLambertMaterial({color:0x2c3e50});
+  function box(w,h,d,mat,x,y,z){
+    const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+    m.position.set(x,y,z); interiorFurniture.add(m);
+  }
+  if(type==='cafe'||type==='restaurant'){
+    box(4,1.0,0.7,wood,0,0.5,-1.5);
+    for(const [tx,tz] of [[-2.5,1.5],[0,1.5],[2.5,1.5]]){
+      const t=new THREE.Mesh(new THREE.CylinderGeometry(0.45,0.45,0.7,8),wood);
+      t.position.set(tx,0.35,tz); interiorFurniture.add(t);
+    }
+  } else if(type==='hospital'){
+    box(2.5,1.05,0.7,white,0,0.52,-1.5);
+    for(const tx of [-2.5,2.5]){ box(2.2,0.5,1.0,white,tx,0.55,0.5); }
+  } else if(type==='school'){
+    for(let i=0;i<4;i++) box(1.2,0.7,0.55,wood,-3+i*2,0.35,1.0);
+    box(5,1.2,0.1,new THREE.MeshLambertMaterial({color:0x1a3a1a}),0,2.0,-3.9);
+  } else if(type==='police'){
+    box(2.5,1.0,0.7,dark,0,0.5,-1.5);
+  } else if(type==='house'){
+    box(2.0,0.5,1.5,wood,-2.5,0.4,0);
+    box(2.0,0.15,1.5,new THREE.MeshLambertMaterial({color:0x5b8def}),-2.5,0.7,0);
+    box(1.2,0.7,0.7,wood,2,0.35,1);
+  } else {
+    box(3,1.0,0.7,wood,0,0.5,-1.5);
+  }
+}
+
+function tryEnterBuilding(){
+  if(interiorActive) return;
+  const p=player.pos;
+  for(const d of doors){
+    if(p.x>d.min.x&&p.x<d.max.x&&p.z>d.min.z&&p.z<d.max.z&&p.y-CONFIG.playerHeight<d.max.y){
+      enterInterior(d); return;
+    }
+  }
+}
+function enterInterior(door){
+  interiorExitPos=door.exitSpot.clone();
+  interiorActive=door.type;
+  outdoorColliders=colliders;
+  colliders=[];
+  fillInterior(door.type);
+  interiorGroup.visible=true;
+  player.pos.set(INT_ORIGIN.x, INT_ORIGIN.y+CONFIG.playerHeight, INT_ORIGIN.z+2.5);
+  player.vel.set(0,0,0);
+  scene.fog.near=30; scene.fog.far=40;
+  scene.background=new THREE.Color(0x2a2a30);
+  console.log('[City] entered',door.type);
+}
+function tryExitInterior(){
+  if(!interiorActive) return;
+  if(player.pos.z > INT_ORIGIN.z+3.0){
+    interiorGroup.visible=false;
+    interiorActive=null;
+    colliders=outdoorColliders||[];
+    player.pos.copy(interiorExitPos);
+    player.vel.set(0,0,0);
+    scene.fog.near=70; scene.fog.far=250;
+    scene.background=new THREE.Color(0x87CEEB);
+    console.log('[City] exited building');
+  }
+}
+
+function buildPlayerBody(){
+  playerBody=new THREE.Group();
+  const skin=new THREE.MeshLambertMaterial({color:0xf0c8a0});
+  const shirt=new THREE.MeshLambertMaterial({color:0x3498db});
+  const pants=new THREE.MeshLambertMaterial({color:0x2c3e50});
+  const torso=new THREE.Mesh(new THREE.BoxGeometry(0.38,0.48,0.24),shirt);
+  torso.position.y=1.05; playerBody.add(torso);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.16,8,6),skin);
+  head.position.y=1.45; playerBody.add(head);
+  const eyeM=new THREE.MeshBasicMaterial({color:0x222222});
+  const eL=new THREE.Mesh(new THREE.SphereGeometry(0.03,5,4),eyeM); eL.position.set(-0.06,1.48,0.14); playerBody.add(eL);
+  const eR=new THREE.Mesh(new THREE.SphereGeometry(0.03,5,4),eyeM); eR.position.set(0.06,1.48,0.14); playerBody.add(eR);
+  const legL=new THREE.Group(); legL.position.set(-0.12,0.8,0);
+  const legLM=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.55,0.14),pants); legLM.position.y=-0.28; legL.add(legLM);
+  playerBody.add(legL);
+  const legR=new THREE.Group(); legR.position.set(0.12,0.8,0);
+  const legRM=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.55,0.14),pants); legRM.position.y=-0.28; legR.add(legRM);
+  playerBody.add(legR);
+  const armL=new THREE.Group(); armL.position.set(-0.26,1.2,0);
+  const armLM=new THREE.Mesh(new THREE.BoxGeometry(0.11,0.45,0.11),shirt); armLM.position.y=-0.22; armL.add(armLM);
+  playerBody.add(armL);
+  const armR=new THREE.Group(); armR.position.set(0.26,1.2,0);
+  const armRM=new THREE.Mesh(new THREE.BoxGeometry(0.11,0.45,0.11),shirt); armRM.position.y=-0.22; armR.add(armRM);
+  playerBody.add(armR);
+  playerBody.userData={legL,legR,armL,armR,torso};
+  playerBody.visible=false;
+  scene.add(playerBody);
+}
+
+function updatePlayerAnim(dt, moving, speed){
+  if(!playerBody) return;
+  playerBody.visible = camMode !== 0;
+  const target = moving ? Math.min(1, speed/CONFIG.moveSpeed) : 0;
+  walkAmt += (target - walkAmt) * Math.min(1, dt*8);
+  if(walkAmt > 0.05) walkPhase += dt * 10 * walkAmt;
+  else walkPhase *= 0.9;
+  const swing = Math.sin(walkPhase) * 0.55 * walkAmt;
+  const bob = Math.abs(Math.sin(walkPhase*2)) * 0.04 * walkAmt;
+  const ud = playerBody.userData;
+  ud.legL.rotation.x = swing;
+  ud.legR.rotation.x = -swing;
+  ud.armL.rotation.x = -swing * 0.8;
+  ud.armR.rotation.x = swing * 0.8;
+  ud.torso.position.y = 1.05 + bob;
+  playerBody.position.set(player.pos.x, player.pos.y - CONFIG.playerHeight, player.pos.z);
+  playerBody.rotation.y = player.yaw;
 }
 
 function placeProps(){
@@ -272,18 +423,32 @@ function placeProps(){
     leaf.position.y=2.2; leaf.scale.y=0.85; tg.add(leaf);
     tg.position.set(px,py,pz); scene.add(tg); trees++;
   }
-  console.log('[City] trees',trees);
 }
 
 function makeCar(color,taxi){
   const g=new THREE.Group();
   const bodyMat=new THREE.MeshLambertMaterial({color});
-  const glass=new THREE.MeshLambertMaterial({color:0x88ccee,transparent:true,opacity:0.7});
+  const glass=new THREE.MeshLambertMaterial({color:0x226688,transparent:true,opacity:0.65});
   const wheelMat=new THREE.MeshLambertMaterial({color:0x222222});
+  const dark=new THREE.MeshLambertMaterial({color:0x333333});
   const body=new THREE.Mesh(new THREE.BoxGeometry(1.9,0.4,0.9),bodyMat);
   body.position.y=0.35; g.add(body);
-  const cabin=new THREE.Mesh(new THREE.BoxGeometry(0.9,0.35,0.8),glass);
+  const cabin=new THREE.Mesh(new THREE.BoxGeometry(0.9,0.35,0.82),glass);
   cabin.position.set(-0.1,0.7,0); g.add(cabin);
+  const hood=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.12,0.85),bodyMat);
+  hood.position.set(0.65,0.52,0); g.add(hood);
+  for(const wz of [0.3,-0.3]){
+    const hl=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.1,0.14),new THREE.MeshBasicMaterial({color:0xfff8e0}));
+    hl.position.set(0.98,0.38,wz); g.add(hl);
+  }
+  for(const wz of [0.3,-0.3]){
+    const tl=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.08,0.12),new THREE.MeshBasicMaterial({color:0xff2222}));
+    tl.position.set(-0.98,0.38,wz); g.add(tl);
+  }
+  for(const wz of [0.52,-0.52]){
+    const mir=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.06,0.12),dark);
+    mir.position.set(0.2,0.65,wz); g.add(mir);
+  }
   if(taxi){
     const sign=new THREE.Mesh(new THREE.BoxGeometry(0.35,0.12,0.2),new THREE.MeshBasicMaterial({color:0xffdd00}));
     sign.position.set(-0.1,0.95,0); g.add(sign);
@@ -318,6 +483,7 @@ function spawnCars(){
   }
 }
 function updateCars(dt){
+  if(interiorActive) return;
   for(const c of cars){
     if(c.axis==='x'){c.mesh.position.x+=c.dir*c.speed*dt;if(c.mesh.position.x>c.bound)c.mesh.position.x=-c.bound;if(c.mesh.position.x<-c.bound)c.mesh.position.x=c.bound;}
     else{c.mesh.position.z+=c.dir*c.speed*dt;if(c.mesh.position.z>c.bound)c.mesh.position.z=-c.bound;if(c.mesh.position.z<-c.bound)c.mesh.position.z=c.bound;}
@@ -333,6 +499,9 @@ function makeNpc(col){
   for(const lx of [-0.1,0.1]){const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.08,0.48,5),pants);leg.position.set(lx,0.24,0);g.add(leg);}
   const torso=new THREE.Mesh(new THREE.BoxGeometry(0.36,0.45,0.22),shirt); torso.position.set(0,0.72,0); g.add(torso);
   const head=new THREE.Mesh(new THREE.SphereGeometry(0.14,6,5),skin); head.position.set(0,1.12,0); g.add(head);
+  const eyeM=new THREE.MeshBasicMaterial({color:0x222222});
+  const eL=new THREE.Mesh(new THREE.SphereGeometry(0.025,4,3),eyeM); eL.position.set(-0.05,1.14,0.12); g.add(eL);
+  const eR=new THREE.Mesh(new THREE.SphereGeometry(0.025,4,3),eyeM); eR.position.set(0.05,1.14,0.12); g.add(eR);
   for(const ax of [-0.24,0.24]){const arm=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.4,5),shirt);arm.position.set(ax,0.7,0);g.add(arm);}
   return g;
 }
@@ -345,18 +514,20 @@ function spawnNpcs(){
     do{x=(Math.random()-0.5)*half*2;z=(Math.random()-0.5)*half*2;tries++;}while(!isClear(x,z,0.7)&&tries<15);
     mesh.position.set(x,getHeight(x,z),z); scene.add(mesh);
     const a=Math.random()*Math.PI*2;
-    npcs.push({mesh,vx:Math.cos(a)*(1+Math.random()),vz:Math.sin(a)*(1+Math.random()),timer:2+Math.random()*4,bound:half});
+    npcs.push({mesh,vx:Math.cos(a)*(1+Math.random()),vz:Math.sin(a)*(1+Math.random()),timer:2+Math.random()*4,bound:half,phase:Math.random()*10});
   }
 }
 function updateNpcs(dt){
+  if(interiorActive) return;
   for(const n of npcs){
-    n.timer-=dt;
+    n.timer-=dt; n.phase+=dt*8;
     if(n.timer<=0){const a=Math.random()*Math.PI*2,s=1+Math.random();n.vx=Math.cos(a)*s;n.vz=Math.sin(a)*s;n.timer=2+Math.random()*4;}
     let nx=n.mesh.position.x+n.vx*dt, nz=n.mesh.position.z+n.vz*dt;
     if(!isClear(nx,nz,0.5)){n.vx*=-1;n.vz*=-1;nx=n.mesh.position.x;nz=n.mesh.position.z;}
     if(Math.abs(nx)>n.bound){n.vx*=-1;nx=THREE.MathUtils.clamp(nx,-n.bound,n.bound);}
     if(Math.abs(nz)>n.bound){n.vz*=-1;nz=THREE.MathUtils.clamp(nz,-n.bound,n.bound);}
-    n.mesh.position.x=nx;n.mesh.position.z=nz;n.mesh.position.y=getHeight(nx,nz);
+    n.mesh.position.x=nx;n.mesh.position.z=nz;
+    n.mesh.position.y=getHeight(nx,nz)+Math.abs(Math.sin(n.phase))*0.03;
     n.mesh.rotation.y=Math.atan2(n.vx,n.vz);
   }
 }
@@ -368,24 +539,16 @@ function spawnAnimals(){
     const g=new THREE.Group(), mat=new THREE.MeshLambertMaterial({color:dogCols[i%3]});
     const body=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.24,0.24),mat); body.position.set(0,0.24,0); g.add(body);
     const head=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.16,0.16),mat); head.position.set(0.28,0.28,0); g.add(head);
+    const snout=new THREE.Mesh(new THREE.BoxGeometry(0.12,0.08,0.1),mat); snout.position.set(0.4,0.24,0); g.add(snout);
     let x,z,tries=0;
     do{x=(Math.random()-0.5)*half*2;z=(Math.random()-0.5)*half*2;tries++;}while(!isClear(x,z,0.5)&&tries<12);
     g.position.set(x,getHeight(x,z),z); scene.add(g);
     const a=Math.random()*Math.PI*2;
     animals.push({mesh:g,vx:Math.cos(a)*1.3,vz:Math.sin(a)*1.3,timer:1.5+Math.random()*3,bound:half});
   }
-  const bm=new THREE.MeshLambertMaterial({color:0x333333});
-  for(let i=0;i<8;i++){
-    const g=new THREE.Group();
-    g.add(new THREE.Mesh(new THREE.SphereGeometry(0.1,5,4),bm));
-    const wL=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.03,0.1),bm); wL.position.set(0,0,0.12); g.add(wL);
-    const wR=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.03,0.1),bm); wR.position.set(0,0,-0.12); g.add(wR);
-    const x=(Math.random()-0.5)*half*1.4, z=(Math.random()-0.5)*half*1.4;
-    g.position.set(x,8+Math.random()*8,z); scene.add(g);
-    birds.push({mesh:g,wL,wR,phase:Math.random()*Math.PI*2,radius:8+Math.random()*14,height:6+Math.random()*10,speed:0.4+Math.random()*0.5,cx:x,cz:z});
-  }
 }
 function updateAnimals(dt){
+  if(interiorActive) return;
   for(const d of animals){
     d.timer-=dt;
     if(d.timer<=0){const a=Math.random()*Math.PI*2,s=1.2+Math.random()*1.5;d.vx=Math.cos(a)*s;d.vz=Math.sin(a)*s;d.timer=1.5+Math.random()*3;}
@@ -395,16 +558,6 @@ function updateAnimals(dt){
     if(Math.abs(nz)>d.bound){d.vz*=-1;nz=THREE.MathUtils.clamp(nz,-d.bound,d.bound);}
     d.mesh.position.x=nx;d.mesh.position.z=nz;d.mesh.position.y=getHeight(nx,nz);
     d.mesh.rotation.y=Math.atan2(d.vx,d.vz);
-  }
-  const t=clock.elapsedTime;
-  for(const b of birds){
-    b.phase+=b.speed*dt;
-    b.mesh.position.x=b.cx+Math.cos(b.phase)*b.radius;
-    b.mesh.position.z=b.cz+Math.sin(b.phase)*b.radius;
-    b.mesh.position.y=b.height+Math.sin(b.phase*2)*1.3;
-    b.mesh.rotation.y=b.phase+Math.PI/2;
-    const flap=Math.sin(t*12+b.phase)*0.4;
-    b.wL.rotation.x=flap; b.wR.rotation.x=-flap;
   }
 }
 
@@ -465,11 +618,20 @@ function updatePlayer(dt){
       if(hx-Math.abs(dx)<hz-Math.abs(dz))nx=cx+Math.sign(dx||1)*hx;else nz=cz+Math.sign(dz||1)*hz;
     }
   }
-  const bound=CONFIG.worldSize*0.46;
-  nx=THREE.MathUtils.clamp(nx,-bound,bound);nz=THREE.MathUtils.clamp(nz,-bound,bound);
+  if(!interiorActive){
+    const bound=CONFIG.worldSize*0.46;
+    nx=THREE.MathUtils.clamp(nx,-bound,bound);nz=THREE.MathUtils.clamp(nz,-bound,bound);
+  } else {
+    nx=THREE.MathUtils.clamp(nx,INT_ORIGIN.x-4.5,INT_ORIGIN.x+4.5);
+    nz=THREE.MathUtils.clamp(nz,INT_ORIGIN.z-3.5,INT_ORIGIN.z+3.8);
+  }
   player.pos.set(nx,ny,nz);
-  const moving=Math.hypot(player.vel.x,player.vel.z)>0.5&&player.onGround;
+  const spd=Math.hypot(player.vel.x,player.vel.z);
+  const moving=spd>0.5&&player.onGround;
   if(moving){footstepTimer-=dt;if(footstepTimer<=0){playFootstep();footstepTimer=0.32;}}else footstepTimer=0;
+  updatePlayerAnim(dt,moving,spd);
+  if(!interiorActive) tryEnterBuilding();
+  else tryExitInterior();
   updateCamera();
 }
 function updateCamera(){
