@@ -23,8 +23,8 @@ html, body { width:100%; height:100%; overflow:hidden; background:#87ceeb; font-
 #cam-btn { position:absolute; top:12px; left:16px; z-index:25; padding:0.45rem 0.75rem; border-radius:8px; background:rgba(255,255,255,0.28); border:2px solid rgba(61,255,154,0.65); color:#1a3a2a; font-size:0.75rem; font-weight:700; letter-spacing:0.08em; box-shadow:0 0 12px rgba(61,255,154,0.25); backdrop-filter:blur(4px); }
 #cam-btn:active { transform:scale(0.94); background:rgba(61,255,154,0.4); }
 #crosshair { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); color:rgba(30,80,50,0.55); font-size:18px; pointer-events:none; text-shadow:0 0 4px rgba(255,255,255,0.6); z-index:5; }
-#interact-btn { position:absolute; left:50%; top:calc(50% + 42px); transform:translateX(-50%); padding:0.55rem 1.4rem; border-radius:10px; background:rgba(61,255,154,0.85); border:2px solid #fff; color:#0a2818; font-size:0.85rem; font-weight:700; letter-spacing:0.1em; z-index:30; box-shadow:0 0 20px rgba(61,255,154,0.7); backdrop-filter:blur(4px); transition:opacity 0.15s, transform 0.15s; }
-#interact-btn.hidden { opacity:0; pointer-events:none; transform:translateX(-50%) scale(0.85); }
+#interact-btn { position:absolute; left:50%; top:calc(50% + 48px); transform:translateX(-50%); padding:0.65rem 1.6rem; border-radius:12px; background:rgba(61,255,154,0.95); border:2px solid #fff; color:#0a2818; font-size:0.9rem; font-weight:800; letter-spacing:0.12em; z-index:60; box-shadow:0 0 24px rgba(61,255,154,0.85); backdrop-filter:blur(4px); transition:opacity 0.12s, transform 0.12s; pointer-events:auto !important; touch-action:manipulation; cursor:pointer; }
+#interact-btn.hidden { opacity:0; pointer-events:none !important; transform:translateX(-50%) scale(0.85); }
 #interact-btn:active { transform:translateX(-50%) scale(0.92); background:rgba(61,255,154,1); }
 #status { position:absolute; top:12px; right:16px; font-size:0.7rem; color:rgba(20,50,40,0.55); letter-spacing:0.05em; pointer-events:none; z-index:5; text-shadow:0 1px 2px rgba(255,255,255,0.5); }
 @media (orientation:portrait) and (max-width:900px) {
