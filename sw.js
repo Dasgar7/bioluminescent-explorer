@@ -1,4 +1,4 @@
-const CACHE = 'bio-explorer-v9';
+const CACHE = 'bio-explorer-v10';
 const ASSETS = ['./','./index.html','./style.css','./game.js','./manifest.json','./icons/icon.svg'];
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
