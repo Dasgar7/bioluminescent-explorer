@@ -1,4 +1,4 @@
-const CACHE = 'city-explorer-v21';
+const CACHE = 'city-explorer-v22';
 const ASSETS = ['./', './index.html', './style.css', './manifest.json', './icons/icon.svg'];
 
 self.addEventListener('install', e => {
