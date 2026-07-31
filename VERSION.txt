@@ -1,1 +1,1 @@
-VERSION 22 - solid building colliders + hinged door swing
+VERSION 23 - bulletproof OPEN DOOR tap + outside door zones
