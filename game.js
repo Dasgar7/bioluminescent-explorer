@@ -19,6 +19,9 @@ let outdoorColliders=null;
 const INT_ORIGIN = new THREE.Vector3(0, -80, 0);
 const _f=new THREE.Vector3(), _r=new THREE.Vector3(), _w=new THREE.Vector3();
 const _t=new THREE.Vector3(), _o=new THREE.Vector3();
+const _lookDir=new THREE.Vector3(), _tmp=new THREE.Vector3();
+let interactEl=null, currentDoorTarget=null, INTERIOR_EXIT_WORLD=null;
+const INTERACT_DIST=4.2, INTERACT_DOT=0.86;
 
 const BTYPES = {
   house:{cols:[0xe8d5b7,0xd4c4a8],roof:0x8b4513,h:[5,9],label:'HOUSE',sign:null,enter:true},
@@ -85,6 +88,7 @@ function init(){
   document.body.addEventListener('touchmove',e=>{if(started)e.preventDefault();},{passive:false});
   fpsEl=document.getElementById('fps');
   camLabelEl=document.getElementById('cam-label');
+  interactEl=document.getElementById('interact-btn');
   animate();
   console.log('[City] ready');
 }
@@ -236,7 +240,7 @@ function placeBuildings(){
       const grp=makeBldg(typeKey,bw,bh,bd);
       grp.position.set(cx,py,cz); scene.add(grp);
       addFoot(cx,cz,bw,bd);
-      if(t.enter && enterCount<12 && bw>6){
+      if(t.enter){
         colliders.push({min:new THREE.Vector3(cx-bw/2-0.1,py,cz-bd/2-0.1),max:new THREE.Vector3(cx-0.9,py+bh+1,cz+bd/2+0.1)});
         colliders.push({min:new THREE.Vector3(cx+0.9,py,cz-bd/2-0.1),max:new THREE.Vector3(cx+bw/2+0.1,py+bh+1,cz+bd/2+0.1)});
         colliders.push({min:new THREE.Vector3(cx-bw/2-0.1,py,cz-bd/2-0.1),max:new THREE.Vector3(cx+bw/2+0.1,py+bh+1,cz+0.15)});
@@ -276,6 +280,7 @@ function buildInteriorRoom(){
   interiorFurniture=new THREE.Group(); interiorGroup.add(interiorFurniture);
   interiorGroup.visible=false;
   scene.add(interiorGroup);
+  INTERIOR_EXIT_WORLD=INT_ORIGIN.clone().add(new THREE.Vector3(0,CONFIG.playerHeight,D/2-0.5));
 }
 
 function fillInterior(type){
@@ -310,14 +315,48 @@ function fillInterior(type){
   }
 }
 
-function tryEnterBuilding(){
-  if(interiorActive) return;
-  const p=player.pos;
-  for(const d of doors){
-    if(p.x>d.min.x&&p.x<d.max.x&&p.z>d.min.z&&p.z<d.max.z&&p.y-CONFIG.playerHeight<d.max.y){
-      enterInterior(d); return;
+function getLookDir(out){
+  const cp=Math.cos(player.pitch);
+  out.set(-Math.sin(player.yaw)*cp, Math.sin(player.pitch), -Math.cos(player.yaw)*cp);
+  return out;
+}
+function updateInteract(){
+  if(!interactEl) return;
+  currentDoorTarget=null;
+  getLookDir(_lookDir);
+  const eye=player.pos;
+  if(!interiorActive){
+    let best=null, bestDot=INTERACT_DOT;
+    for(const d of doors){
+      const cx=(d.min.x+d.max.x)*0.5, cz=(d.min.z+d.max.z)*0.5;
+      const cy=THREE.MathUtils.clamp(eye.y, d.min.y, d.max.y);
+      _tmp.set(cx,cy,cz).sub(eye);
+      const dist=_tmp.length();
+      if(dist>INTERACT_DIST||dist<0.001) continue;
+      _tmp.multiplyScalar(1/dist);
+      const dot=_tmp.dot(_lookDir);
+      if(dot>bestDot){bestDot=dot;best=d;}
     }
+    currentDoorTarget=best;
+    interactEl.textContent='ENTER';
+  } else if(INTERIOR_EXIT_WORLD){
+    _tmp.copy(INTERIOR_EXIT_WORLD).sub(eye);
+    const dist=_tmp.length();
+    if(dist<=INTERACT_DIST&&dist>0.001){
+      _tmp.multiplyScalar(1/dist);
+      if(_tmp.dot(_lookDir)>INTERACT_DOT) currentDoorTarget='exit';
+    }
+    interactEl.textContent='EXIT';
   }
+  interactEl.classList.toggle('hidden',!currentDoorTarget);
+}
+function doInteract(){
+  if(!currentDoorTarget) return;
+  playUiClick();
+  if(currentDoorTarget==='exit') exitInterior();
+  else enterInterior(currentDoorTarget);
+  currentDoorTarget=null;
+  if(interactEl) interactEl.classList.add('hidden');
 }
 function enterInterior(door){
   interiorExitPos=door.exitSpot.clone();
@@ -332,18 +371,16 @@ function enterInterior(door){
   scene.background=new THREE.Color(0x2a2a30);
   console.log('[City] entered',door.type);
 }
-function tryExitInterior(){
+function exitInterior(){
   if(!interiorActive) return;
-  if(player.pos.z > INT_ORIGIN.z+3.0){
-    interiorGroup.visible=false;
-    interiorActive=null;
-    colliders=outdoorColliders||[];
-    player.pos.copy(interiorExitPos);
-    player.vel.set(0,0,0);
-    scene.fog.near=70; scene.fog.far=250;
-    scene.background=new THREE.Color(0x87CEEB);
-    console.log('[City] exited building');
-  }
+  interiorGroup.visible=false;
+  interiorActive=null;
+  colliders=outdoorColliders||[];
+  player.pos.copy(interiorExitPos);
+  player.vel.set(0,0,0);
+  scene.fog.near=70; scene.fog.far=250;
+  scene.background=new THREE.Color(0x87CEEB);
+  console.log('[City] exited building');
 }
 
 function buildPlayerBody(){
@@ -585,6 +622,7 @@ function setupControls(){
     lookZone.addEventListener('touchend',e=>{for(const t of e.changedTouches)if(t.identifier===lookId)lookId=null;});
   }
   if(jumpBtn){jumpBtn.addEventListener('touchstart',e=>{e.preventDefault();tryJump();},{passive:false});jumpBtn.addEventListener('click',tryJump);}
+  if(interactEl){interactEl.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();doInteract();},{passive:false});interactEl.addEventListener('click',doInteract);}
   if(camBtn){camBtn.addEventListener('touchstart',e=>{e.preventDefault();cycleCamera();},{passive:false});camBtn.addEventListener('click',cycleCamera);}
   window.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space'){e.preventDefault();tryJump();}if(e.code==='KeyC')cycleCamera();});
   window.addEventListener('keyup',e=>{keys[e.code]=false;});
@@ -630,8 +668,7 @@ function updatePlayer(dt){
   const moving=spd>0.5&&player.onGround;
   if(moving){footstepTimer-=dt;if(footstepTimer<=0){playFootstep();footstepTimer=0.32;}}else footstepTimer=0;
   updatePlayerAnim(dt,moving,spd);
-  if(!interiorActive) tryEnterBuilding();
-  else tryExitInterior();
+  updateInteract();
   updateCamera();
 }
 function updateCamera(){
