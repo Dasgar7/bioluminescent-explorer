@@ -34,8 +34,9 @@
       <div id="look-zone"></div>
       <button id="jump-btn" aria-label="Jump">↑</button>
       <button id="cam-btn" aria-label="Camera mode">CAM</button>
-      <button id="interact-btn" class="hidden" aria-label="Open door">OPEN</button>
+      <button id="interact-btn" class="hidden" aria-label="Open door">OPEN DOOR</button>
       <div id="crosshair">+</div>
+      <div id="door-debug">DOOR DBG</div>
       <div id="status">
         <span id="cam-label">1st</span> · <span id="fps">60</span> FPS
       </div>
@@ -52,7 +53,7 @@
     }
   }
   </script>
-  <script type="module" src="./game.js?v=23"></script>
+  <script type="module" src="./game.js?v=24"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
