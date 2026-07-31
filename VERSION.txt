@@ -1,1 +1,1 @@
-VERSION 21 - door open animation + fixed OPEN DOOR tap
+VERSION 22 - solid building colliders + hinged door swing
