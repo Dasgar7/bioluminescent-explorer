@@ -1,1 +1,1 @@
-BUILD v19 LIVE - roads zebras traffic lights OPEN DOOR
+VERSION 20 - dense city upgrade 2026-07-31T12:12:00Z
