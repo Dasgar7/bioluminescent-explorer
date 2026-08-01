@@ -32,10 +32,20 @@
         </div>
       </div>
       <div id="look-zone"></div>
-      <button id="jump-btn" aria-label="Jump">JMP</button>
+      <button id="jump-btn" aria-label="Jump">↑</button>
       <button id="cam-btn" aria-label="Camera mode">CAM</button>
-      <button id="interact-btn" class="hidden" aria-label="Open door">OPEN DOOR</button>
+      <button id="task-btn" aria-label="Tasks">TASKS</button>
+      <button id="interact-btn" class="hidden" aria-label="Interact">OPEN DOOR</button>
       <div id="crosshair">+</div>
+      <div id="bars">
+        <div class="bar-row"><span class="bar-label">HUNGER</span><div class="bar-track"><div id="hunger-fill" class="bar-fill"></div></div></div>
+        <div class="bar-row"><span class="bar-label">ENERGY</span><div class="bar-track"><div id="energy-fill" class="bar-fill"></div></div></div>
+      </div>
+      <div id="task-panel" class="hidden">
+        <div class="task-title">TASKS</div>
+        <ul id="task-list"></ul>
+      </div>
+      <div id="toast" class="hidden"></div>
       <div id="status">
         <span id="cam-label">1st</span> · <span id="fps">60</span> FPS
       </div>
@@ -52,7 +62,7 @@
     }
   }
   </script>
-  <script type="module" src="./game.js?v=26"></script>
+  <script type="module" src="./game.js?v=27"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
