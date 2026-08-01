@@ -1,4 +1,4 @@
-const CACHE = 'city-explorer-v25b';
+const CACHE = 'city-explorer-v26';
 const ASSETS = ['./', './index.html', './style.css', './manifest.json', './icons/icon.svg'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
